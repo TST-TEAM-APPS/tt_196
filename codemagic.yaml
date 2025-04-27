@@ -1,0 +1,78 @@
+workflows:
+  unity-ios-workflow:
+    name: Unity iOS Workflow
+    max_build_duration: 120
+    integrations:
+      app_store_connect: ApiKey_TT196
+    environment:
+      unity: 2022.3.19f1
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.eer84wf.qe
+      groups:
+        - unity_credentials
+      vars:
+        UNITY_IOS_DIR: ios
+        XCODE_PROJECT: "Unity-iPhone.xcodeproj"
+        XCODE_WORKSPACE: "Unity-iPhone.xcworkspace"
+        XCODE_SCHEME: "Unity-iPhone"
+        BUNDLE_ID: "com.eer84wf.qe"
+        APP_STORE_APPLE_ID: 6744400509
+      cocoapods: default
+    scripts:
+      - name: Activate Unity license
+        script: | 
+          $UNITY_HOME/Contents/MacOS/Unity -batchmode -quit -logFile \
+            -serial ${UNITY_SERIAL} \
+            -username ${UNITY_EMAIL} \
+            -password ${UNITY_PASSWORD}
+      - name: Generate the Xcode project from Unity
+        script: | 
+          $UNITY_HOME/Contents/MacOS/Unity -batchmode \
+            -quit \
+            -logFile \
+            -projectPath . \
+            -executeMethod BuildScript.BuildIos \
+            -nographics
+      - name: Set up code signing settings on Xcode project
+        script: | 
+          xcode-project use-profiles
+      - name: Set the build number
+        script: | 
+          BUILD_NUMBER=1
+          cd $UNITY_IOS_DIR
+          agvtool new-version -all $BUILD_NUMBER
+      - name: Install pods
+        script: | 
+          cd $UNITY_IOS_DIR
+          pod init
+          pod deintegrate
+          pod install
+      - name: Build the project
+        script: | 
+          xcode-project build-ipa \
+          --workspace "$UNITY_IOS_DIR/$XCODE_WORKSPACE" \
+          --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+    publishing:
+      scripts:
+        - name: Deactivate Unity License
+          script: | 
+            /Applications/Unity\ Hub.app/Contents/Frameworks/UnityLicensingClient_V1.app/Contents/MacOS/Unity.Licensing.Client \
+            --return-ulf \
+            --username ${UNITY_EMAIL} \
+            --password ${UNITY_PASSWORD}
+      email:
+        recipients:
+          - denwhite223@gmail.com
+          - vervicowork@gmail.com
+          - kameneckiy228@gmail.com
+        notify:
+          success: true
+          failure: false
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: false 
+        submit_to_app_store: false
